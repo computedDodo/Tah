@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Tahfiz Tracker</title>
+  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Tahfiz%20Tracker%22%2C%22short_name%22%3A%22Tahfiz%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23faf9f6%22%2C%22theme_color%22%3A%22%238b7355%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Ctext%20y%3D'.9em'%20font-size%3D'90'%3E%F0%9F%93%96%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22100x100%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+  <meta name="theme-color" content="#8b7355">
+  <style>
+    /* (Same beautiful CSS you already approved – omitted for brevity, but I'll include a link to a compressed version) */
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(145deg, #faf9f6 0%, #f2efe9 100%);
+      min-height: 100vh;
+      color: #2c241b;
+      padding: 1.5rem 1rem;
+      -webkit-font-smoothing: antialiased;
+    }
+    .app-container { max-width: 1100px; margin:0 auto; }
+    h1 { font-weight:600; font-size:2.2rem; color:#3a2e24; }
+    .header-decoration span { height:3px; width:60px; background:#c6a35e; border-radius:100px; display:inline-block; opacity:0.4; margin-right:8px; }
+    .header-decoration span:nth-child(2) { width:20px; opacity:0.8; }
+    .btn {
+      display:inline-flex; align-items:center; gap:6px;
+      font-weight:500; font-size:1rem; padding:0.75rem 1.5rem;
+      border-radius:40px; border:none; text-decoration:none;
+      transition: all 0.15s; cursor:pointer; min-height:48px;
+    }
+    .btn-primary { background:#8b7355; color:white; }
+    .btn-success { background:#5f7a6b; color:white; }
+    .btn-outline { background:transparent; border:1px solid #e7dfd5; color:#5f5346; }
+    .card { background:rgba(255,255,255,0.85); border-radius:24px; padding:1.75rem 1.5rem; box-shadow:0 8px 20px rgba(0,0,0,0.03); margin-bottom:2rem; }
+    input, select { width:100%; padding:0.9rem 1.25rem; font-size:1rem; border:1.5px solid #e7dfd5; border-radius:16px; background:white; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:1rem; text-align:left; border-bottom:1px solid #f0eae3; }
+    .action-cell { display:flex; gap:8px; flex-wrap:wrap; }
+    @media(max-width:600px) { .btn { width:100%; } }
+  </style>
+</head>
+<body>
+<div class="app-container">
+  <h1>📖 Tahfiz Tracker</h1>
+  <div class="header-decoration"><span></span><span></span><span></span></div>
+  <hr style="border:none;border-top:1px solid #e7dfd5;margin:1rem 0;">
+
+  <!-- App screens (dynamic with JavaScript) -->
+  <div id="app"></div>
+</div>
+
+<script>
+  // =========== APP LOGIC ===========
+  const DB_NAME = 'tahfizDB';
+  let db;
+
+  // Open IndexedDB
+  const request = indexedDB.open(DB_NAME, 1);
+  request.onupgradeneeded = e => {
+    db = e.target.result;
+    if (!db.objectStoreNames.contains('students')) {
+      const studentStore = db.createObjectStore('students', { keyPath: 'id', autoIncrement: true });
+      studentStore.createIndex('name', 'name', { unique: false });
+    }
+    if (!db.objectStoreNames.contains('targets')) {
+      db.createObjectStore('targets', { keyPath: 'studentId' });
+    }
+    if (!db.objectStoreNames.contains('progress')) {
+      const progressStore = db.createObjectStore('progress', { keyPath: 'id', autoIncrement: true });
+      progressStore.createIndex('studentId', 'studentId', { unique: false });
+      progressStore.createIndex('date', 'date', { unique: false });
+    }
+  };
+  request.onsuccess = e => { db = e.target.result; renderApp(); };
+  request.onerror = e => console.error('DB error', e);
+
+  // Helpers
+  function tx(storeName, mode = 'readonly') { return db.transaction(storeName, mode).objectStore(storeName); }
+
+  async function getStudents() {
+    return new Promise(res => {
+      const req = tx('students').getAll();
+      req.onsuccess = () => res(req.result);
+    });
+  }
+
+  async function getTarget(studentId) {
+    return new Promise(res => {
+      const req = tx('targets').get(studentId);
+      req.onsuccess = () => res(req.result || null);
+    });
+  }
+
+  async function getProgress(studentId) {
+    return new Promise(res => {
+      const index = tx('progress').index('studentId');
+      const req = index.getAll(studentId);
+      req.onsuccess = () => {
+        const entries = req.result || [];
+        entries.sort((a,b) => new Date(b.date) - new Date(a.date)); // most recent first
+        res(entries.slice(0, 10)); // show last 10
+      };
+    });
+  }
+
+  async function getAllData() {
+    const students = await getStudents();
+    const results = [];
+    for (let s of students) {
+      const target = await getTarget(s.id);
+      const progress = await getProgress(s.id);
+      results.push({ ...s, target, progress });
+    }
+    return results;
+  }
+
+  // Export CSV for a student
+  function exportCSV(studentId, studentName) {
+    getProgress(studentId).then(progress => {
+      if (progress.length === 0) {
+        alert('No progress to export.');
+        return;
+      }
+      let csv = 'Date,Pages Memorized,Notes\n';
+      progress.forEach(p => {
+        csv += `"${p.date}","${p.pagesMemorized}","${p.notes || ''}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${studentName.replace(/\s+/g,'_')}_progress.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  // =========== UI RENDERING ===========
+  let currentScreen = 'home';
+
+  function renderApp() {
+    const appDiv = document.getElementById('app');
+    switch (currentScreen) {
+      case 'home': renderHome(appDiv); break;
+      case 'addStudent': renderAddStudent(appDiv); break;
+      case 'setTarget': renderSetTarget(appDiv); break;
+      case 'progress': renderProgress(appDiv); break;
+    }
+  }
+
+  function renderHome(container) {
+    container.innerHTML = '';
+    const headerDiv = document.createElement('div');
+    headerDiv.style.display = 'flex';
+    headerDiv.style.justifyContent = 'space-between';
+    headerDiv.style.alignItems = 'center';
+    headerDiv.style.marginBottom = '1rem';
+    const h2 = document.createElement('h2');
+    h2.textContent = 'Students';
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn btn-primary';
+    addBtn.textContent = '+ Add Student';
+    addBtn.onclick = () => { currentScreen = 'addStudent'; renderApp(); };
+    headerDiv.appendChild(h2);
+    headerDiv.appendChild(addBtn);
+    container.appendChild(headerDiv);
+
+    const tableWrapper = document.createElement('div');
+    tableWrapper.className = 'table-wrapper card';
+    const table = document.createElement('table');
+    table.innerHTML = `
+      <thead><tr><th>Name</th><th>Daily Goal</th><th>Session (min)</th><th>Actions</th></tr></thead>
+      <tbody id="students-tbody"></tbody>
+    `;
+    tableWrapper.appendChild(table);
+    container.appendChild(tableWrapper);
+
+    getStudents().then(async students => {
+      const tbody = document.getElementById('students-tbody');
+      tbody.innerHTML = '';
+      for (let s of students) {
+        const target = await getTarget(s.id);
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><strong>${s.name}</strong></td>
+          <td>${target ? target.dailyGoalPages + ' pages' : '<span class="badge-notset">Not set</span>'}</td>
+          <td>${target ? target.sessionDuration + ' min' : '<span class="badge-notset">—</span>'}</td>
+          <td></td>
+        `;
+        const actionCell = row.querySelector('td:last-child');
+        actionCell.className = 'action-cell';
+        
+        const setTargetBtn = document.createElement('button');
+        setTargetBtn.className = 'btn btn-outline btn-sm';
+        setTargetBtn.textContent = 'Set Target';
+        setTargetBtn.onclick = () => { currentScreen = 'setTarget'; sessionStorage.setItem('currentStudentId', s.id); renderApp(); };
+        
+        const progressBtn = document.createElement('button');
+        progressBtn.className = 'btn btn-outline btn-sm';
+        progressBtn.style.borderColor = '#5f7a6b'; // success outline
+        progressBtn.style.color = '#5f7a6b';
+        progressBtn.textContent = 'Track Progress';
+        progressBtn.onclick = () => { currentScreen = 'progress'; sessionStorage.setItem('currentStudentId', s.id); renderApp(); };
+        
+        actionCell.appendChild(setTargetBtn);
+        actionCell.appendChild(progressBtn);
+        tbody.appendChild(row);
+      }
+    });
+  }
+
+  function renderAddStudent(container) {
+    container.innerHTML = `
+      <div class="card">
+        <h2>Add New Student</h2>
+        <form id="addForm">
+          <div class="form-group"><label>Full Name</label><input type="text" name="name" required autofocus placeholder="e.g., Ahmad Abdullah"></div>
+          <div class="btn-group" style="margin-top:1rem;">
+            <button type="submit" class="btn btn-primary">Add Student</button>
+            <button type="button" class="btn btn-outline" onclick="currentScreen='home';renderApp();">Cancel</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.getElementById('addForm').onsubmit = e => {
+      e.preventDefault();
+      const name = e.target.name.value.trim();
+      if (!name) return;
+      const store = tx('students', 'readwrite');
+      store.add({ name });
+      store.transaction.oncomplete = () => { currentScreen = 'home'; renderApp(); };
+    };
+  }
+
+  function renderSetTarget(container) {
+    const studentId = Number(sessionStorage.getItem('currentStudentId'));
+    getStudents().then(students => {
+      const student = students.find(s => s.id === studentId);
+      getTarget(studentId).then(target => {
+        container.innerHTML = `
+          <div class="card">
+            <h2>Set Target for ${student.name}</h2>
+            <form id="targetForm">
+              <div class="form-row" style="display:flex; gap:1rem;">
+                <div class="form-group" style="flex:1"><label>Daily Goal (pages)</label><input type="number" step="0.5" name="goal" value="${target ? target.dailyGoalPages : ''}" required></div>
+                <div class="form-group" style="flex:1"><label>Session (min)</label><input type="number" name="duration" value="${target ? target.sessionDuration : ''}" required></div>
+              </div>
+              <div class="btn-group" style="margin-top:1rem;">
+                <button type="submit" class="btn btn-success">Save Target</button>
+                <button type="button" class="btn btn-outline" onclick="currentScreen='home';renderApp();">Back</button>
+              </div>
+            </form>
+          </div>
+        `;
+        document.getElementById('targetForm').onsubmit = e => {
+          e.preventDefault();
+          const goal = parseFloat(e.target.goal.value);
+          const duration = parseInt(e.target.duration.value);
+          const targetStore = tx('targets', 'readwrite');
+          targetStore.put({ studentId: studentId, dailyGoalPages: goal, sessionDuration: duration });
+          targetStore.transaction.oncomplete = () => { currentScreen = 'home'; renderApp(); };
+        };
+      });
+    });
+  }
+
+  function renderProgress(container) {
+    const studentId = Number(sessionStorage.getItem('currentStudentId'));
+    getStudents().then(students => {
+      const student = students.find(s => s.id === studentId);
+      Promise.all([getTarget(studentId), getProgress(studentId)]).then(([target, progress]) => {
+        container.innerHTML = `
+          <div class="card">
+            <h2>Daily Progress: ${student.name}</h2>
+            ${target ? `<div class="goal-indicator" style="background:#e6d9c8;padding:0.5rem 1rem;border-radius:50px;">⚡ Goal: ${target.dailyGoalPages} pages / ${target.sessionDuration} min</div>` : '<p><a href="#" onclick="currentScreen=\'setTarget\';sessionStorage.setItem(\'currentStudentId\',\'${studentId}\');renderApp();return false;">Set a target first</a></p>'}
+            <div style="margin-top:1.5rem;">
+              <h4>Log Today's Progress</h4>
+              <form id="progressForm">
+                <div class="form-row" style="display:flex; gap:1rem;">
+                  <div class="form-group" style="flex:1"><label>Date</label><input type="date" name="date" value="${new Date().toISOString().split('T')[0]}"></div>
+                  <div class="form-group" style="flex:1"><label>Pages Memorized</label><input type="number" step="0.5" name="pages" required></div>
+                  <div class="form-group" style="flex:1"><label>Notes</label><input type="text" name="notes" placeholder="Surah, revision..."></div>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Progress</button>
+              </form>
+            </div>
+          </div>
+          <div class="table-wrapper card">
+            <h4>Recent Progress</h4>
+            <table><thead><tr><th>Date</th><th>Pages</th><th>Notes</th></tr></thead><tbody id="progress-tbody"></tbody></table>
+            <button class="btn btn-outline" style="margin-top:1rem;" onclick="exportCSV(${studentId}, '${student.name.replace(/'/g, "\\'")}')">⬇ Download Progress (CSV)</button>
+          </div>
+          <div style="margin-top:1rem;"><button class="btn btn-outline" onclick="currentScreen='home';renderApp();">← Back to Students</button></div>
+        `;
+        const tbody = document.getElementById('progress-tbody');
+        if (progress.length) {
+          progress.forEach(p => {
+            tbody.innerHTML += `<tr><td>${p.date}</td><td>${p.pagesMemorized}</td><td>${p.notes || ''}</td></tr>`;
+          });
+        } else {
+          tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">✨ No progress yet.</td></tr>';
+        }
+        document.getElementById('progressForm').onsubmit = e => {
+          e.preventDefault();
+          const date = e.target.date.value;
+          const pages = parseFloat(e.target.pages.value);
+          const notes = e.target.notes.value.trim();
+          const store = tx('progress', 'readwrite');
+          store.add({ studentId, date, pagesMemorized: pages, notes });
+          store.transaction.oncomplete = () => { renderProgress(container); };
+        };
+      });
+    });
+  }
+
+  // Service Worker Registration (for offline support)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register("data:application/javascript," + encodeURIComponent(`
+        self.addEventListener('install', e => self.skipWaiting());
+        self.addEventListener('activate', e => clients.claim());
+        self.addEventListener('fetch', e => e.respondWith(
+          caches.match(e.request).then(r => r || fetch(e.request))
+        ));
+      `));
+    });
+  }
+</script>
+</body>
+</html>
