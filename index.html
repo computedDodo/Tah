@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#132a52" />
+<title>Ibnidrees Educational Services &mdash; Online Learning Platform (Prototype)</title>
+<meta name="description" content="Clickable prototype for Ibnidrees Educational Services' online tutoring platform." />
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="proto-strip">This is a clickable prototype with sample data &mdash; nothing submitted here is real yet.</div>
+
+<header class="site-header">
+  <div class="wrap site-header__inner">
+    <button class="brand" data-nav="/" aria-label="Ibnidrees home">
+      <span class="brand__mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3z"/><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>
+      </span>
+      <span class="brand__text">
+        <strong>IBNIDREES</strong>
+        <small>Educational Services</small>
+      </span>
+    </button>
+
+    <nav class="site-nav" id="site-nav">
+      <button class="site-nav__link" data-nav="/">Home</button>
+      <button class="site-nav__link" data-nav="/subjects">Subjects</button>
+      <button class="site-nav__link" data-nav="/enroll">Enrol</button>
+      <button class="site-nav__link" data-nav="/portal">Portal preview</button>
+    </nav>
+
+    <button class="btn btn--gold btn--sm site-header__cta" data-nav="/enroll">Enrol now</button>
+    <button class="icon-btn nav-toggle" id="nav-toggle" aria-label="Menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<footer class="site-footer">
+  <div class="wrap site-footer__grid">
+    <div class="site-footer__brand">
+      <span class="brand__text"><strong>IBNIDREES</strong><small>Educational Services</small></span>
+      <p>Intensive private tutoring for Primary, JSS &amp; SSS students &mdash; online across Nigeria, and in person in Lafia, Nasarawa State.</p>
+    </div>
+    <div>
+      <h4>Get in touch</h4>
+      <a class="site-footer__link" href="https://wa.me/2348109351073" target="_blank" rel="noopener">WhatsApp: 0810 935 1073</a>
+      <a class="site-footer__link" href="mailto:abdulmaleekidreesahmad@gmail.com">abdulmaleekidreesahmad@gmail.com</a>
+    </div>
+    <div>
+      <h4>Explore</h4>
+      <button class="site-footer__link" data-nav="/subjects">Subjects</button>
+      <button class="site-footer__link" data-nav="/enroll">Enrol a student</button>
+      <button class="site-footer__link" data-nav="/portal">Portal preview</button>
+    </div>
+  </div>
+  <p class="site-footer__fine">Prototype build for internal review &mdash; not the live Ibnidrees platform.</p>
+</footer>
+
+<script src="js/data.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/router.js"></script>
+<script src="js/pages-public.js"></script>
+<script src="js/pages-portal.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
